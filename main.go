@@ -2,79 +2,81 @@ package main
 
 import (
 	"fmt"
+	"net"
+	"strings"
 	// "net"
-	"time"
 )
 
-// func read_connection(conn net.Conn, recv_chan chan byte) chan byte {
-// 	bytes := make([]byte, 1024)
-// 	send_chan := make(chan byte)
+func read_connection(addr string, output chan []byte) {
 
-// 	go func() {
-// 		for {
-// 			len, er := conn.Read(bytes)
+	split_addr := strings.SplitN(addr, ":", 2)
 
-// 			if er != nil {
-// 				fmt.Printf("Failed to read connection. Error: %s", er)
-// 				break
-// 			}
-// 			fmt.Println("Sending data")
+	fmt.Println("Address information:", split_addr)
 
-// 			i := 0
-// 			for i < len {
-// 				fmt.Println("More things")
-// 				send_chan <- bytes[i]
-// 				fmt.Println("More things again")
-// 			}
-// 		}
+	conn, err := net.Dial(split_addr[0], split_addr[1])
+	fmt.Println("Connection:", conn, "Error:", err)
 
-// 		fmt.Println("Function Complete")
-// 	}()
-
-// 	return send_chan
-// }
-
-func looper(recv chan int) {
-	i := 0
-	for i < 100 {
-		recv <- i
-		time.Sleep(50 * time.Millisecond)
-		i++
+	if err != nil {
+		return
 	}
-	close(recv)
-}
+
+	buffer := make([]byte, 1024)
+
+	
+	for {
+		fmt.Println("Reading data on:", addr)
+		length, read_err := conn.Read(buffer)
+		fmt.Println("Data length:", length)
+		if read_err != nil {
+			fmt.Println("Data read error on:", addr)
+		}
+
+		output <- buffer[:length]
+	}
+	
+} 
 
 func main() {
 
-	recv := make(chan int)
+	server_addr, _ := net.ResolveUDPAddr("udp", ":5760")
+	
+	server_conn, _ := net.ListenUDP("udp", server_addr)
 
-	go looper(recv)
+	defer server_conn.Close()
+
+	buf := make([]byte, 1024)
 
 	for {
-		if recv != nil {
-			fmt.Printf("Got: %d\n", <- recv)
-		} else {
-			break
+		n, addr, err := server_conn.ReadFromUDP(buf)
+
+		if err != nil {
+			fmt.Println("Got error:", err)
 		}
+
+		fmt.Println("Data:", string(buf[0:n]), "from", addr)
 	}
 
-	// conn1, er1 := net.Dial("tcp", "127.0.0.1:5810")
-	// conn2, er2 := net.Dial("tcp", "127.0.0.1:5820")
 
-	// recv_chan := make(chan byte)
+	// var addr_array []string
 
-	// if er1 != nil && er2 != nil {
-	// 	fmt.Printf("Failed to create Connection! Error: %s, %s", er1, er2)
-	// 	return
+	// addr_array = append(addr_array, "udp:127.0.0.1:5760", "udp:127.0.0.1:5770")
+	// output_chan := make(chan []byte)
+
+	// read_connection("udp:127.0.0.1:5760", output_chan)
+
+	// for i := 0; i<len(addr_array); i++ {
+	// 	fmt.Println("Addr:", addr_array[i])
+	// 	go read_connection(addr_array[i], output_chan)
 	// }
-
-	// go read_connection(conn1, recv_chan)
-	// go read_connection(conn2, recv_chan)
-
-	// fmt.Println("All connections made!")
 
 	// for {
-	// 	fmt.Printf("Recv Data: %d", <-recv_chan)
-	// }
+	// 	output, open := <- output_chan
 
+	// 	if open {
+	// 		fmt.Println("Incoming data:", output)
+	// 	} else {
+	// 		fmt.Println("Main channel closed! Program closing!")
+	// 		break
+	// 	}
+	// }
 }
