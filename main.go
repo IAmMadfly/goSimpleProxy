@@ -2,79 +2,76 @@ package main
 
 import (
 	"fmt"
-	// "net"
-	"time"
+	"net"
+	// "time"
+	"strings"
 )
 
-// func read_connection(conn net.Conn, recv_chan chan byte) chan byte {
-// 	bytes := make([]byte, 1024)
-// 	send_chan := make(chan byte)
-
-// 	go func() {
-// 		for {
-// 			len, er := conn.Read(bytes)
-
-// 			if er != nil {
-// 				fmt.Printf("Failed to read connection. Error: %s", er)
-// 				break
-// 			}
-// 			fmt.Println("Sending data")
-
-// 			i := 0
-// 			for i < len {
-// 				fmt.Println("More things")
-// 				send_chan <- bytes[i]
-// 				fmt.Println("More things again")
-// 			}
-// 		}
-
-// 		fmt.Println("Function Complete")
-// 	}()
-
-// 	return send_chan
-// }
-
-func looper(recv chan int) {
-	i := 0
-	for i < 100 {
-		recv <- i
-		time.Sleep(50 * time.Millisecond)
-		i++
+func read_udp_connection(address string, recv_chan chan []byte) {
+	// defer close(recv_chan)
+	addr, addr_er := net.ResolveUDPAddr("udp", address)
+	if addr_er != nil {
+		fmt.Println("Address Error:", addr_er)
 	}
-	close(recv)
+
+	conn, conn_er := net.ListenUDP("udp", addr)
+	if conn_er != nil {
+		fmt.Println("Connection Error:", conn_er)
+	}
+
+	buffer := make([]byte, 1024)
+	for {
+		fmt.Println("Reading from:", address)
+		len, incomming_addr, read_er := conn.ReadFromUDP(buffer)
+
+		if read_er != nil {
+			fmt.Println("Read error:", read_er)
+			break
+		}
+		fmt.Println("Incoming data from:", incomming_addr)
+
+		recv_chan <- buffer[:len]
+	}
+}
+
+func read_tcp_connection(address string, recv_chan chan []byte) {
+	
 }
 
 func main() {
 
-	recv := make(chan int)
+	addr_array := []string{
+		"udp:127.0.0.1:5760",
+		"udp:127.0.0.1:5770",
+	}
 
-	go looper(recv)
+	recv:= make(chan []byte)
 
-	for {
-		if recv != nil {
-			fmt.Printf("Got: %d\n", <- recv)
-		} else {
-			break
+	for i:=0;i<len(addr_array);i++ {
+		addr_info := strings.SplitN(addr_array[i], ":", 2)
+
+		switch addr_info[0] {
+			case "udp":
+				fmt.Println("IT IS A UDP")
+				go read_udp_connection(addr_info[1], recv)
+			case "tcp":
+				fmt.Println("Another TCP")
+			default:
+				fmt.Println("Unknown type! Type:", addr_info[0])
 		}
 	}
 
-	// conn1, er1 := net.Dial("tcp", "127.0.0.1:5810")
-	// conn2, er2 := net.Dial("tcp", "127.0.0.1:5820")
+	fmt.Println("Reading input!")
 
-	// recv_chan := make(chan byte)
+	for {
+		data, open := <- recv
 
-	// if er1 != nil && er2 != nil {
-	// 	fmt.Printf("Failed to create Connection! Error: %s, %s", er1, er2)
-	// 	return
-	// }
-
-	// go read_connection(conn1, recv_chan)
-	// go read_connection(conn2, recv_chan)
-
-	// fmt.Println("All connections made!")
-
-	// for {
-	// 	fmt.Printf("Recv Data: %d", <-recv_chan)
-	// }
+		if open {
+			fmt.Println("Data out:", string(data[:]))
+		} else {
+			fmt.Println("Channel closed!")
+			break
+		}
+	}
 
 }
